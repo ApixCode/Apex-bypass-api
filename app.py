@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 def get_pastebin_content(url):
     """
-    Fetches raw text from a Pastebin URL.
+    Fetches raw text from a Pastebin URL via its /raw endpoint.
     """
     match = re.search(r'pastebin\.com/([a-zA-Z0-9]+)', url)
     if not match:
@@ -30,8 +30,9 @@ def get_pastebin_content(url):
 
 def get_pastedrop_content(url):
     """
-    Fetches and PARSES a Pastedrop URL to extract the raw text content.
+    Scrapes the Pastedrop page to extract the raw text content.
     """
+
     if "/paste/" not in url:
         return None, "Invalid Pastedrop URL. Must contain '/paste/'."
 
@@ -54,7 +55,7 @@ def get_pastedrop_content(url):
 
 def get_pastefy_content(url):
     """
-    Fetches raw text from a Pastefy URL, preserving necessary query parameters like 'hash'.
+    Fetches raw text from a Pastefy URL via its /raw endpoint.
     """
     parts = url.split('?')
     base_url = parts[0]
@@ -73,31 +74,41 @@ def get_pastefy_content(url):
         return None, f"Could not fetch content from Pastefy: {e}"
 
 
-# <-- FINAL, VERIFIED FUNCTION FOR JUSTPASTE.IT -->
+# <-- FINAL, VERIFIED, SCRAPING-BASED FUNCTION FOR JUSTPASTE.IT -->
 def get_justpasteit_content(url):
     """
-    Fetches raw text from a JustPaste.it URL using the correct /download/{id} path.
+    Scrapes the main JustPaste.it page to extract the raw text content from its HTML.
+    This is a robust method that does not rely on hidden endpoints.
     """
-    match = re.search(r'justpaste\.it/([a-zA-Z0-9]+)', url)
-    if not match:
-        return None, "Invalid JustPaste.it URL format. Could not find paste ID."
-    
-    paste_id = match.group(1)
-
-    # THIS IS THE FIX: The correct endpoint is /download/, not /txt/
-    raw_url = f"https://justpaste.it/download/{paste_id}"
-
     try:
+        # Use the provided URL directly, not a modified one.
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(raw_url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-        return response.text, None
+
+        # Parse the page's HTML content
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # The paste content is located in a div with the class "article-content"
+        content_div = soup.find('div', class_='article-content')
+
+        if content_div:
+            # Extract the text, preserving line breaks between paragraphs
+            raw_text = content_div.get_text(separator='\n', strip=True)
+            return raw_text, None
+        else:
+            # This error triggers if JustPaste.it changes their website structure
+            return None, "Could not find the 'article-content' div on the JustPaste.it page."
+
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from JustPaste.it: {e}"
 
 
 @app.route('/api/apex', methods=['GET'])
 def get_paste_components():
+    """
+    The main API endpoint.
+    """
     target_url = request.args.get('url')
 
     if not target_url:
