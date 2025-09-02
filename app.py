@@ -3,11 +3,13 @@
 from flask import Flask, request, jsonify
 import requests
 import re
+from bs4 import BeautifulSoup # <-- IMPORT BEAUTIFUL SOUP
 
 # Initialize the Flask application
 app = Flask(__name__)
 
 # --- Helper function to get content from Pastebin ---
+# (This function remains the same)
 def get_pastebin_content(url):
     """
     Fetches raw text from a Pastebin URL.
@@ -27,27 +29,39 @@ def get_pastebin_content(url):
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from Pastebin: {e}"
 
-# --- CORRECTED Helper function to get content from Pastedrop ---
+# --- FULLY CORRECTED Helper function to get content from Pastedrop ---
 def get_pastedrop_content(url):
     """
-    Fetches raw text from a Pastedrop URL.
-    It transforms the standard URL into the 'raw' version by replacing '/paste/' with '/raw/'.
+    Fetches and PARSES a Pastedrop URL to extract the raw text content.
     """
-    # Check if the URL is valid and contains '/paste/'
     if "/paste/" not in url:
         return None, "Invalid Pastedrop URL. Must contain '/paste/'."
 
-    # NEW: Replace '/paste/' with '/raw/' to get the correct raw content URL
     raw_url = url.replace("/paste/", "/raw/")
     
     try:
         response = requests.get(raw_url, timeout=5)
         response.raise_for_status()
-        return response.text, None
+
+        # Use BeautifulSoup to parse the HTML content
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Find the specific div with class="content" that holds the text
+        content_div = soup.find('div', class_='content')
+
+        if content_div:
+            # Extract the text and strip any leading/trailing whitespace
+            raw_text = content_div.get_text(strip=True)
+            return raw_text, None
+        else:
+            # If we can't find that specific div, the page structure might have changed
+            return None, "Could not find the content container on the Pastedrop page."
+
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from Pastedrop: {e}"
 
 # --- API Endpoint Definition ---
+# (This function remains the same)
 @app.route('/api/apex', methods=['GET'])
 def get_paste_components():
     target_url = request.args.get('url')
@@ -58,10 +72,8 @@ def get_paste_components():
     content = None
     error_message = None
 
-    # --- Logic to determine which site to scrape ---
     if 'pastebin.com' in target_url:
         content, error_message = get_pastebin_content(target_url)
-    # UPDATED: Check for the correct Pastedrop domain
     elif 'paste-drop.com' in target_url:
         content, error_message = get_pastedrop_content(target_url)
     else:
