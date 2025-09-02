@@ -52,19 +52,23 @@ def get_pastedrop_content(url):
         return None, f"Could not fetch content from Pastedrop: {e}"
 
 
-# <-- NEW FUNCTION FOR PASTEFTY -->
+# <-- FULLY CORRECTED FUNCTION FOR PASTEFTY -->
 def get_pastefy_content(url):
     """
-    Fetches raw text from a Pastefy URL.
+    Fetches raw text from a Pastefy URL, preserving necessary query parameters like 'hash'.
     """
-    # Regex to find the Paste ID from various Pastefy URL formats
-    match = re.search(r'pastefy\.app/([a-zA-Z0-9]+)', url)
-    if not match:
-        return None, "Invalid Pastefy URL format."
+    # Split the URL to separate the base path from the query string (?hash=...)
+    parts = url.split('?')
+    base_url = parts[0]
+    query_string = f"?{parts[1]}" if len(parts) > 1 else ""
 
-    paste_id = match.group(1)
-    # Construct the raw content URL, which is simply /{paste_id}/raw
-    raw_url = f"https://pastefy.app/{paste_id}/raw"
+    # If '/raw' is already in the URL, we can use it directly
+    if '/raw' in base_url:
+        raw_url = url
+    else:
+        # Otherwise, add '/raw' to the end of the base URL path
+        # Use rstrip to remove a potential trailing slash before adding /raw
+        raw_url = base_url.rstrip('/') + '/raw' + query_string
 
     try:
         response = requests.get(raw_url, timeout=5)
@@ -93,11 +97,9 @@ def get_paste_components():
         content, error_message = get_pastebin_content(target_url)
     elif 'paste-drop.com' in target_url:
         content, error_message = get_pastedrop_content(target_url)
-    # <-- ADDED PASTEFTY SUPPORT -->
     elif 'pastefy.app' in target_url:
         content, error_message = get_pastefy_content(target_url)
     else:
-        # <-- UPDATED ERROR MESSAGE -->
         error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, or Pastefy URL."
 
     if error_message:
