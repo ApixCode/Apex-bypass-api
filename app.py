@@ -52,22 +52,17 @@ def get_pastedrop_content(url):
         return None, f"Could not fetch content from Pastedrop: {e}"
 
 
-# <-- FULLY CORRECTED FUNCTION FOR PASTEFTY -->
 def get_pastefy_content(url):
     """
     Fetches raw text from a Pastefy URL, preserving necessary query parameters like 'hash'.
     """
-    # Split the URL to separate the base path from the query string (?hash=...)
     parts = url.split('?')
     base_url = parts[0]
     query_string = f"?{parts[1]}" if len(parts) > 1 else ""
 
-    # If '/raw' is already in the URL, we can use it directly
     if '/raw' in base_url:
         raw_url = url
     else:
-        # Otherwise, add '/raw' to the end of the base URL path
-        # Use rstrip to remove a potential trailing slash before adding /raw
         raw_url = base_url.rstrip('/') + '/raw' + query_string
 
     try:
@@ -76,6 +71,29 @@ def get_pastefy_content(url):
         return response.text, None
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from Pastefy: {e}"
+
+# <-- NEW FUNCTION FOR JUSTPASTE.IT -->
+def get_justpasteit_content(url):
+    """
+    Fetches raw text from a JustPaste.it URL.
+    """
+    # Clean the URL to get the base path, removing queries or fragments
+    base_url = url.split('?')[0].split('#')[0].rstrip('/')
+    
+    # Construct the text URL if it's not already pointing to it
+    if not base_url.endswith('/txt'):
+        raw_url = f"{base_url}/txt"
+    else:
+        raw_url = base_url
+
+    try:
+        # Add a User-Agent header to avoid being blocked by simple anti-bot measures
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        response = requests.get(raw_url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.text, None
+    except requests.exceptions.RequestException as e:
+        return None, f"Could not fetch content from JustPaste.it: {e}"
 
 
 @app.route('/api/apex', methods=['GET'])
@@ -99,8 +117,12 @@ def get_paste_components():
         content, error_message = get_pastedrop_content(target_url)
     elif 'pastefy.app' in target_url:
         content, error_message = get_pastefy_content(target_url)
+    # <-- ADDED JUSTPASTE.IT SUPPORT -->
+    elif 'justpaste.it' in target_url:
+        content, error_message = get_justpasteit_content(target_url)
     else:
-        error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, or Pastefy URL."
+        # <-- UPDATED ERROR MESSAGE -->
+        error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, Pastefy, or JustPaste.it URL."
 
     if error_message:
         return jsonify({"error": error_message}), 400
