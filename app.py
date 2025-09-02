@@ -72,23 +72,22 @@ def get_pastefy_content(url):
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from Pastefy: {e}"
 
-# <-- FULLY CORRECTED FUNCTION FOR JUSTPASTE.IT -->
+
+# <-- FINAL, VERIFIED FUNCTION FOR JUSTPASTE.IT -->
 def get_justpasteit_content(url):
     """
-    Fetches raw text from a JustPaste.it URL by constructing the correct /txt/{id} path.
+    Fetches raw text from a JustPaste.it URL using the correct /download/{id} path.
     """
-    # Use a regular expression to reliably extract the paste ID from the URL
     match = re.search(r'justpaste\.it/([a-zA-Z0-9]+)', url)
     if not match:
         return None, "Invalid JustPaste.it URL format. Could not find paste ID."
     
     paste_id = match.group(1)
 
-    # Construct the correct URL with /txt/ BEFORE the paste ID
-    raw_url = f"https://justpaste.it/txt/{paste_id}"
+    # THIS IS THE FIX: The correct endpoint is /download/, not /txt/
+    raw_url = f"https://justpaste.it/download/{paste_id}"
 
     try:
-        # Add a User-Agent header to avoid being blocked by simple anti-bot measures
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(raw_url, headers=headers, timeout=5)
         response.raise_for_status()
@@ -99,10 +98,6 @@ def get_justpasteit_content(url):
 
 @app.route('/api/apex', methods=['GET'])
 def get_paste_components():
-    """
-    The main API endpoint. It takes a URL, determines the service,
-    and returns the paste content in the specified JSON format.
-    """
     target_url = request.args.get('url')
 
     if not target_url:
