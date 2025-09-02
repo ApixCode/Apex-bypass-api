@@ -3,20 +3,20 @@ import requests
 from bs4 import BeautifulSoup
 import os
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options  # Import ChromeOptions
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from urllib.parse import urlparse, urlencode, parse_qs
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
+from urllib.parse import urlparse
 import time
+import random  # For adding random delays
 
 app = Flask(__name__)
 
 # --- Configuration and Setup ---
-# Make sure you have chromedriver installed and accessible in your PATH
-# Or specify the path to the driver:
-CHROME_DRIVER_PATH = os.environ.get("CHROME_DRIVER_PATH", "/usr/bin/chromedriver")  # Default: /usr/bin/chromedriver.  Make sure it's correct on Vercel!
+CHROME_DRIVER_PATH = os.environ.get("CHROME_DRIVER_PATH", "/usr/bin/chromedriver")
 
 # --- Helper Functions ---
 def is_valid_url(url):
@@ -26,54 +26,78 @@ def is_valid_url(url):
     except ValueError:
         return False
 
+def bypass_pastebin(url):
+    """Bypasses a Pastebin link."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        content_element = soup.find("textarea", class_="textarea")  # Inspect Pastebin's HTML and verify this
+        if content_element:
+            content = content_element.text.strip()
+            return content
+        else:
+            return None  # Content not found
+    except requests.exceptions.RequestException as e:
+        print(f"Pastebin Request Error: {e}")
+        return None
+    except Exception as e:
+        print(f"Pastebin General Error: {e}")
+        return None
+
 def bypass_linkvertise(url):
-    """
-    Bypasses a Linkvertise link using Selenium.
-
-    Args:
-        url: The Linkvertise URL.
-
-    Returns:
-        The final destination URL if successful, or None if there's an error.
-    """
+    """Bypasses a Linkvertise link using Selenium."""
     try:
         # --- Selenium Setup ---
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Run in headless mode (no GUI)
-        chrome_options.add_argument("--no-sandbox")  # Required for some environments (like Vercel)
-        chrome_options.add_argument("--disable-dev-shm-usage")  #  Saves memory
-        # Set a user agent.  This helps prevent bot detection.  You can find many user agents online.
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        # --- User Agent (Important - Replace with a current one) ---
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") # REPLACE WITH A CURRENT USER AGENT
 
-        # Use Service to manage the ChromeDriver instance.  This is the recommended approach.
+        # Use Service to manage the ChromeDriver instance.
         service = Service(executable_path=CHROME_DRIVER_PATH)
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.set_page_load_timeout(30) # Set a timeout to prevent infinite loading
+        driver.set_page_load_timeout(30) # Prevent infinite loading
 
         # --- Navigate to the Linkvertise Page ---
         driver.get(url)
+        time.sleep(random.uniform(1, 3)) # Add a short delay after page load
 
-        # --- Wait for and Click the "Free Access" Button (Modify Selectors if needed) ---
+        # --- Click the "Free Access" Button (Inspect and Update Selector) ---
         try:
-            WebDriverWait(driver, 20).until(
-                EC.element_to_be_clickable((By.ID, "connect-button"))  # Changed selector
-            ).click()
-            time.sleep(3) # Add a short delay to allow the page to load after the click
+            #  **CRITICAL:**  Inspect the HTML of the Linkvertise page and find the correct element.  The ID or other selector might be different.
+            #  Example:  WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "some-free-access-button"))).click()
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "connect-button"))).click() #  <- UPDATE THIS!
+            time.sleep(random.uniform(2, 4)) # Add a short delay after the click
 
-        except Exception as e:
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
             print(f"Error clicking 'Free Access' button: {e}")
+            driver.save_screenshot("free_access_error.png")  # Save a screenshot for debugging
+            driver.quit()
+            return None
+        except Exception as e:
+            print(f"Unexpected error clicking 'Free Access': {e}")
+            driver.save_screenshot("free_access_unexpected_error.png")
             driver.quit()
             return None
 
-        # --- Wait for the Continue Button (Modify Selectors if needed) ---
+        # --- Click the "Continue" Button (Inspect and Update Selector) ---
         try:
-            WebDriverWait(driver, 20).until(
-                EC.element_to_be_clickable((By.ID, "link-success"))  # Changed selector
-            ).click()
-            time.sleep(3) # Add a short delay
+            # **CRITICAL:**  Inspect the HTML. The ID or other selector will likely be different.
+            # Example:  WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "another-continue-button"))).click()
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "link-success"))).click()  # <- UPDATE THIS!
+            time.sleep(random.uniform(2, 4)) # Add a short delay
 
-        except Exception as e:
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
             print(f"Error clicking 'Continue' button: {e}")
+            driver.save_screenshot("continue_error.png")
+            driver.quit()
+            return None
+        except Exception as e:
+            print(f"Unexpected error clicking 'Continue': {e}")
+            driver.save_screenshot("continue_unexpected_error.png")
             driver.quit()
             return None
 
@@ -85,45 +109,28 @@ def bypass_linkvertise(url):
     except Exception as e:
         print(f"Selenium error: {e}")
         try:
-            driver.quit() # Ensure the driver is quit even if there's an error.
+            driver.save_screenshot("selenium_error.png")
+            driver.quit()
         except:
             pass
         return None
 
 
-
 @app.route("/api/apex-kazuma/bypass", methods=["GET"])
 def bypass_api():
-    """
-    Bypasses a URL (Pastebin or Linkvertise).
-
-    Args:
-        url: The URL to bypass (Pastebin or Linkvertise).
-
-    Returns:
-        JSON response with the bypassed content or an error message.
-    """
+    """Bypasses a URL (Pastebin or Linkvertise)."""
     url = request.args.get("url")
 
     if not url or not is_valid_url(url):
         return jsonify({"success": False, "error": "Missing or invalid 'url' parameter"}), 400
 
-    # --- Pastebin Bypass (Reusing the previous code) ---
+    # --- Pastebin Bypass ---
     if "pastebin.com" in url:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            content_element = soup.find("textarea", class_="textarea")
-            if content_element:
-                content = content_element.text.strip()
-                return jsonify({"success": True, "result": content})
-            else:
-                return jsonify({"success": False, "error": "Content not found. Pastebin structure might have changed."}), 404
-        except requests.exceptions.RequestException as e:
-            return jsonify({"success": False, "error": f"Request failed: {str(e)}"}), 500
-        except Exception as e:
-            return jsonify({"success": False, "error": f"An error occurred: {str(e)}"}), 500
+        content = bypass_pastebin(url)
+        if content:
+            return jsonify({"success": True, "result": content})
+        else:
+            return jsonify({"success": False, "error": "Failed to bypass Pastebin"}), 404
 
     # --- Linkvertise Bypass ---
     elif "linkvertise.com" in url:
@@ -141,4 +148,4 @@ def bypass_api():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(debug=True, host="0.0.0.0", port=port)
-  
+    
