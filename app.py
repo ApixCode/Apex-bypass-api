@@ -72,19 +72,20 @@ def get_pastefy_content(url):
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from Pastefy: {e}"
 
-# <-- NEW FUNCTION FOR JUSTPASTE.IT -->
+# <-- FULLY CORRECTED FUNCTION FOR JUSTPASTE.IT -->
 def get_justpasteit_content(url):
     """
-    Fetches raw text from a JustPaste.it URL.
+    Fetches raw text from a JustPaste.it URL by constructing the correct /txt/{id} path.
     """
-    # Clean the URL to get the base path, removing queries or fragments
-    base_url = url.split('?')[0].split('#')[0].rstrip('/')
+    # Use a regular expression to reliably extract the paste ID from the URL
+    match = re.search(r'justpaste\.it/([a-zA-Z0-9]+)', url)
+    if not match:
+        return None, "Invalid JustPaste.it URL format. Could not find paste ID."
     
-    # Construct the text URL if it's not already pointing to it
-    if not base_url.endswith('/txt'):
-        raw_url = f"{base_url}/txt"
-    else:
-        raw_url = base_url
+    paste_id = match.group(1)
+
+    # Construct the correct URL with /txt/ BEFORE the paste ID
+    raw_url = f"https://justpaste.it/txt/{paste_id}"
 
     try:
         # Add a User-Agent header to avoid being blocked by simple anti-bot measures
@@ -110,18 +111,15 @@ def get_paste_components():
     content = None
     error_message = None
 
-    # Determine which function to call based on the URL's domain
     if 'pastebin.com' in target_url:
         content, error_message = get_pastebin_content(target_url)
     elif 'paste-drop.com' in target_url:
         content, error_message = get_pastedrop_content(target_url)
     elif 'pastefy.app' in target_url:
         content, error_message = get_pastefy_content(target_url)
-    # <-- ADDED JUSTPASTE.IT SUPPORT -->
     elif 'justpaste.it' in target_url:
         content, error_message = get_justpasteit_content(target_url)
     else:
-        # <-- UPDATED ERROR MESSAGE -->
         error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, Pastefy, or JustPaste.it URL."
 
     if error_message:
