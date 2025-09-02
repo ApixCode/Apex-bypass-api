@@ -73,34 +73,59 @@ def get_pastefy_content(url):
         return None, f"Could not fetch content from Pastefy: {e}"
 
 
-# <-- FINAL, VERIFIED, SCRAPING-BASED FUNCTION FOR JUSTPASTE.IT -->
 def get_justpasteit_content(url):
     """
-    Scrapes the JustPaste.it page. It correctly parses the simplified HTML 
-    that is served to scripts and bots.
+    Scrapes the JustPaste.it page by parsing the simplified HTML served to scripts.
     """
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-
-        # Parse the HTML content
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # THIS IS THE FIX: The simplified page for scripts contains the content
-        # directly within a <p> tag inside the body.
         content_paragraph = soup.find('p')
 
         if content_paragraph:
-            # Extract the text from the <p> tag
             raw_text = content_paragraph.get_text(strip=True)
             return raw_text, None
         else:
-            # This error will trigger if they change the structure of their simplified page
             return None, "Could not find the main '<p>' tag on the simplified JustPaste.it page."
-
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from JustPaste.it: {e}"
+
+
+# <-- NEW FUNCTION FOR CTXT.IO -->
+def get_ctxt_content(url):
+    """
+    Fetches content from ctxt.io by using its official JSON API.
+    This is the most reliable method, not traditional scraping.
+    """
+    # Regex to extract the paste ID from the URL (e.g., AAD4_LFXEg)
+    match = re.search(r'ctxt\.io/(?:[a-zA-Z0-9]+/)?([a-zA-Z0-9_-]+)', url)
+    if not match:
+        return None, "Invalid ctxt.io URL format. Could not find paste ID."
+    
+    paste_id = match.group(1)
+    
+    # Construct the API URL
+    api_url = f"https://ctxt.io/api/v1/paste/{paste_id}"
+
+    try:
+        response = requests.get(api_url, timeout=5)
+        response.raise_for_status()
+        
+        # Parse the JSON response from the API
+        data = response.json()
+
+        # The paste content is inside the 'content' key
+        if 'content' in data:
+            return data['content'], None
+        else:
+            return None, "API response from ctxt.io is valid but did not contain a 'content' key."
+
+    except requests.exceptions.RequestException as e:
+        return None, f"Could not fetch content from ctxt.io API: {e}"
+    except ValueError: # This handles cases where response.json() fails
+        return None, "Failed to parse JSON response from ctxt.io API."
 
 
 @app.route('/api/apex', methods=['GET'])
@@ -124,8 +149,12 @@ def get_paste_components():
         content, error_message = get_pastefy_content(target_url)
     elif 'justpaste.it' in target_url:
         content, error_message = get_justpasteit_content(target_url)
+    # <-- ADDED CTXT.IO SUPPORT -->
+    elif 'ctxt.io' in target_url:
+        content, error_message = get_ctxt_content(target_url)
     else:
-        error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, Pastefy, or JustPaste.it URL."
+        # <-- UPDATED ERROR MESSAGE -->
+        error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, Pastefy, JustPaste.it, or ctxt.io URL."
 
     if error_message:
         return jsonify({"error": error_message}), 400
