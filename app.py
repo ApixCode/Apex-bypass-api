@@ -93,30 +93,28 @@ def get_justpasteit_content(url):
         return None, f"Could not fetch content from JustPaste.it: {e}"
 
 
-# <-- NEW FUNCTION FOR CTXT.IO -->
+# <-- FINAL, VERIFIED FUNCTION FOR CTXT.IO -->
 def get_ctxt_content(url):
     """
     Fetches content from ctxt.io by using its official JSON API.
-    This is the most reliable method, not traditional scraping.
+    This version correctly captures the full path as the paste identifier.
     """
-    # Regex to extract the paste ID from the URL (e.g., AAD4_LFXEg)
-    match = re.search(r'ctxt\.io/(?:[a-zA-Z0-9]+/)?([a-zA-Z0-9_-]+)', url)
+    # THIS IS THE FIX: The regex now captures the ENTIRE path after the domain.
+    match = re.search(r'ctxt\.io/(.+)', url)
     if not match:
         return None, "Invalid ctxt.io URL format. Could not find paste ID."
     
-    paste_id = match.group(1)
+    # paste_id will now correctly be "2/AAD4_LFXEg"
+    paste_id = match.group(1).rstrip('/')
     
-    # Construct the API URL
+    # Construct the correct API URL
     api_url = f"https://ctxt.io/api/v1/paste/{paste_id}"
 
     try:
         response = requests.get(api_url, timeout=5)
         response.raise_for_status()
-        
-        # Parse the JSON response from the API
         data = response.json()
 
-        # The paste content is inside the 'content' key
         if 'content' in data:
             return data['content'], None
         else:
@@ -124,7 +122,7 @@ def get_ctxt_content(url):
 
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from ctxt.io API: {e}"
-    except ValueError: # This handles cases where response.json() fails
+    except ValueError:
         return None, "Failed to parse JSON response from ctxt.io API."
 
 
@@ -149,11 +147,9 @@ def get_paste_components():
         content, error_message = get_pastefy_content(target_url)
     elif 'justpaste.it' in target_url:
         content, error_message = get_justpasteit_content(target_url)
-    # <-- ADDED CTXT.IO SUPPORT -->
     elif 'ctxt.io' in target_url:
         content, error_message = get_ctxt_content(target_url)
     else:
-        # <-- UPDATED ERROR MESSAGE -->
         error_message = "Unsupported URL. Please use a valid Pastebin, paste-drop.com, Pastefy, JustPaste.it, or ctxt.io URL."
 
     if error_message:
