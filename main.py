@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
 from urllib.parse import urlparse
 import time
-import random  # For adding random delays
+import random
 
 app = Flask(__name__)
 
@@ -27,7 +27,7 @@ def is_valid_url(url):
         return False
 
 def bypass_pastebin(url):
-    """Bypasses a Pastebin link."""
+    """Bypasses a Pastebin link by scraping."""
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -45,16 +45,16 @@ def bypass_pastebin(url):
         print(f"Pastebin General Error: {e}")
         return None
 
+
 def bypass_linkvertise(url):
     """Bypasses a Linkvertise link using Selenium."""
     try:
         # --- Selenium Setup ---
         chrome_options = Options()
-        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")  # Run in headless mode
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        # --- User Agent (Important - Replace with a current one) ---
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") # REPLACE WITH A CURRENT USER AGENT
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")  # REPLACE WITH A CURRENT USER AGENT
 
         # Use Service to manage the ChromeDriver instance.
         service = Service(executable_path=CHROME_DRIVER_PATH)
@@ -67,9 +67,9 @@ def bypass_linkvertise(url):
 
         # --- Click the "Free Access" Button (Inspect and Update Selector) ---
         try:
-            #  **CRITICAL:**  Inspect the HTML of the Linkvertise page and find the correct element.  The ID or other selector might be different.
-            #  Example:  WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "some-free-access-button"))).click()
-            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "connect-button"))).click() #  <- UPDATE THIS!
+            # **CRITICAL:** Inspect the HTML of the Linkvertise page and find the correct element. The ID or other selector might be different.
+            # Example: WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "some-free-access-button"))).click()
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "connect-button"))).click() # UPDATE THIS!
             time.sleep(random.uniform(2, 4)) # Add a short delay after the click
 
         except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
@@ -85,9 +85,9 @@ def bypass_linkvertise(url):
 
         # --- Click the "Continue" Button (Inspect and Update Selector) ---
         try:
-            # **CRITICAL:**  Inspect the HTML. The ID or other selector will likely be different.
-            # Example:  WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "another-continue-button"))).click()
-            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "link-success"))).click()  # <- UPDATE THIS!
+            # **CRITICAL:** Inspect the HTML. The ID or other selector will likely be different.
+            # Example: WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "another-continue-button"))).click()
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "link-success"))).click()  # UPDATE THIS!
             time.sleep(random.uniform(2, 4)) # Add a short delay
 
         except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
