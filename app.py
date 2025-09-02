@@ -32,7 +32,6 @@ def get_pastedrop_content(url):
     """
     Scrapes the Pastedrop page to extract the raw text content.
     """
-
     if "/paste/" not in url:
         return None, "Invalid Pastedrop URL. Must contain '/paste/'."
 
@@ -77,28 +76,28 @@ def get_pastefy_content(url):
 # <-- FINAL, VERIFIED, SCRAPING-BASED FUNCTION FOR JUSTPASTE.IT -->
 def get_justpasteit_content(url):
     """
-    Scrapes the main JustPaste.it page to extract the raw text content from its HTML.
-    This is a robust method that does not rely on hidden endpoints.
+    Scrapes the JustPaste.it page. It correctly parses the simplified HTML 
+    that is served to scripts and bots.
     """
     try:
-        # Use the provided URL directly, not a modified one.
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
 
-        # Parse the page's HTML content
+        # Parse the HTML content
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # The paste content is located in a div with the class "article-content"
-        content_div = soup.find('div', class_='article-content')
+        # THIS IS THE FIX: The simplified page for scripts contains the content
+        # directly within a <p> tag inside the body.
+        content_paragraph = soup.find('p')
 
-        if content_div:
-            # Extract the text, preserving line breaks between paragraphs
-            raw_text = content_div.get_text(separator='\n', strip=True)
+        if content_paragraph:
+            # Extract the text from the <p> tag
+            raw_text = content_paragraph.get_text(strip=True)
             return raw_text, None
         else:
-            # This error triggers if JustPaste.it changes their website structure
-            return None, "Could not find the 'article-content' div on the JustPaste.it page."
+            # This error will trigger if they change the structure of their simplified page
+            return None, "Could not find the main '<p>' tag on the simplified JustPaste.it page."
 
     except requests.exceptions.RequestException as e:
         return None, f"Could not fetch content from JustPaste.it: {e}"
