@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
-from bs4 import BeautifulSoup
+import re
 import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -26,25 +26,42 @@ def is_valid_url(url):
     except ValueError:
         return False
 
+def get_paste_id(url):
+    """
+    Extracts the unique ID from a Pastebin URL.
+    Handles both standard and raw URLs.
+    Example: 'https://pastebin.com/abcdef12' -> 'abcdef12'
+    """
+    match = re.search(r'pastebin\.com/(?:raw/)?([a-zA-Z0-9]+)', url)
+    if match:
+        return match.group(1)
+    return None
+
 def bypass_pastebin(url):
     """Bypasses a Pastebin link by scraping."""
+    paste_id = get_paste_id(url)
+    if not paste_id:
+        return None  # Invalid Pastebin URL format
+
+    raw_url = f"https://pastebin.com/raw/{paste_id}"
+
     try:
-        response = requests.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(raw_url, headers=headers, timeout=10)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        content_element = soup.find("textarea", class_="textarea")  # Inspect Pastebin's HTML and verify this
-        if content_element:
-            content = content_element.text.strip()
-            return content
-        else:
-            return None  # Content not found
-    except requests.exceptions.RequestException as e:
-        print(f"Pastebin Request Error: {e}")
+        return response.text
+
+    except requests.exceptions.HTTPError as http_err:
+        print(f"Pastebin HTTP error: {http_err}")
+        return None
+    except requests.exceptions.RequestException as req_err:
+        print(f"Pastebin Request error: {req_err}")
         return None
     except Exception as e:
-        print(f"Pastebin General Error: {e}")
+        print(f"Pastebin General error: {e}")
         return None
-
 
 def bypass_linkvertise(url):
     """Bypasses a Linkvertise link using Selenium."""
